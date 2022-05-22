@@ -22,6 +22,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using System;
 using System.Runtime.InteropServices;
+using UnityEngine.UI;
 
 [Serializable]
 public class GstUnityBridgeCroppingParams
@@ -261,10 +262,10 @@ public class GstUnityBridgeTexture : MonoBehaviour
                 mat.SetTextureScale(tex_name, new Vector2(Mathf.Abs(mat.mainTextureScale.x) * (m_FlipX ? -1F : 1F),
                                                           Mathf.Abs(mat.mainTextureScale.y) * (m_FlipY ? -1F : 1F)));
             }
-            else
-            if (GetComponent<GUITexture>())
+            else if (GetComponent<UnityEngine.UI.Image>())
             {
-                GetComponent<GUITexture>().texture = m_Texture;
+                var image = GetComponent<UnityEngine.UI.Image>();
+                image.GetComponent<RawImage>().texture = m_Texture;
             }
             else
             {
@@ -305,7 +306,7 @@ public class GstUnityBridgeTexture : MonoBehaviour
         }
         else
         {
-            m_Texture.Resize(m_Width, m_Height, TextureFormat.RGB24, false);
+            m_Texture.Reinitialize(m_Width, m_Height, TextureFormat.RGB24, false);
             m_Texture.Apply(false, false);
         }
         m_Texture.filterMode = FilterMode.Bilinear;

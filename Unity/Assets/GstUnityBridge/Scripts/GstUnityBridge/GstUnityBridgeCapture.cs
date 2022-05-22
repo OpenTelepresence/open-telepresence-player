@@ -49,7 +49,7 @@ class GstUnityBridgeCapture : MonoBehaviour
         GStreamer.GUBUnityDebugLogPFN log_handler = null;
         if (Application.isEditor)
         {
-            log_handler = (int level, string message) => Debug.logger.Log((LogType)level, "GUB", message);
+            log_handler = (int level, string message) => Debug.unityLogger.Log((LogType)level, "GUB", message);
         }
 
         GStreamer.Ref("2", log_handler);
