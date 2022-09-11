@@ -2,7 +2,7 @@
 
 Open Teleprsence is a project that aims to create an open source multiplatform framework for immersive telepresence experience based on 360 video. The core elements to provide such experience are:
 
-* 360 camera live capture system with low-latency capacity (up to 1 second)
+* 360 camera live capture system with low-latency capacity (E2E latency must be less than 1 second)
 * Multipltaform player to join thte immersive experience
 * Video backend to process/route video and metadata betweent the different clients participating in the immersive experience
 
