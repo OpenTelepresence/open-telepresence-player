@@ -12,4 +12,4 @@ For better integration and interoperability seek, all the communication protocol
 Requirements: Unity 2021.3.2f1
 
 
-Inspired from project: https://github.com/ua-i2cat/gst-unity-bridge
+Player based on project: https://github.com/ua-i2cat/gst-unity-bridge
