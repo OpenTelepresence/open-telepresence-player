@@ -328,7 +328,8 @@ gst_dvb_css_wc_packet_send (const GstDvbCssWcPacket * packet,
 
 gint8 gst_dvb_css_wc_packet_encode_precision(gdouble precisionSecs)
 {        
-    return (gint8)ceil(log2((precisionSecs)));
+    //return (gint8)ceil(log2((precisionSecs)));
+	return (gint8)ceil(log((precisionSecs))/log(2)); // Log2(x) = log(x)/log(2) --> Apparently our runtime doesn't have log2 in math lib (!!)
 }
 
 gdouble gst_dvb_css_wc_packet_decode_precision(gint8 precision)

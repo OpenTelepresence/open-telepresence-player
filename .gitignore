@@ -1,3 +1,6 @@
 *.sdf
 *.opendb
 .vs
+/Plugin/GUB/Project/Android/GUB/obj
+/Plugin/DvbCssWc/Project/Windows/DvbCssWc.vcxproj.user
+/Plugin/DvbCssWc/Project/Windows/PropertySheet.props

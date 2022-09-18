@@ -1,11 +1,11 @@
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-GUB_ROOT := $(abspath $(LOCAL_PATH)/../../../../..)
 DVB_CSS_WC_SOURCE_PATH := $(GUB_ROOT)/Plugin/DvbCssWc/Source
 GSTREAMER_PROJECT_PATH := $(GUB_ROOT)/Plugin/Externals/gstreamer/Project/Android
 
 LOCAL_MODULE           := DvbCssWc
+LOCAL_C_INCLUDES       := $(GSTREAMER_ROOT_ANDROID)/lib/gstreamer-1.0/include $(GSTREAMER_ROOT_ANDROID)/include/gstreamer-1.0/ $(GSTREAMER_ROOT_ANDROID)/include/glib-2.0/ $(GSTREAMER_ROOT_ANDROID)/lib/glib-2.0/include/
 LOCAL_SRC_FILES        := $(DVB_CSS_WC_SOURCE_PATH)/gstdvbcsswcclient.c \
                           $(DVB_CSS_WC_SOURCE_PATH)/gstdvbcsswcpacket.c \
                           $(DVB_CSS_WC_SOURCE_PATH)/gstdvbcsswcserver.c \
