@@ -13,7 +13,7 @@ Download and install Unity LTS version [LTS Release 2021.3.2f1][1] for Windows 6
 1. Download *Gstreamer 1.0* both [1.14.5 runtime][2] installer and [1.14.5 development][3] installer and for both of them just use the following instructions:
 2. Click **Custom** to check that the **C:/** is selected (sometimes the installer choose D:/ as well)
 3. Press Back button and choose Complete option for installation. At the end you should have a new folder called gstreamr at your C:/
-4. Add gstreamer directory to your PATH env variable so windows can find its libraries while loading gstreamer plugin:
+4. Add gstreamer to your PATH env variable so windows can find its libraries when loading the plugin:
     - Computer -> `System properties -> Advanced System Settings -> Advanced Tab -> Environment Variables... -> System Variables`
     - Update PATH Variable: `Path -> Edit -> New -> C:\gstreamer\1.0\x86_64\bin (adjust this path to your installation)`
     - Refresh PATH variable: open a cmd windows terminal and write: ​`> PATH=C` , close the cmd termina and restart it
