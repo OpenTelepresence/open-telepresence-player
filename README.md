@@ -22,7 +22,7 @@ Download and install Unity LTS version [LTS Release 2021.3.2f1][1] for Windows 6
 ## Getting started
 1. Clone/Download this project to your directory of choice
 2. Launch Unity and select the option `Open` (to open a new project)
-4. Browse to the Directory `open-telepresence-player` and select the Directory *Unity* (This will open this project in Unity)
+4. Browse to the Directory `open-telepresence-player` and select the Directory *Unity*
 13. Drag & Drop the scene `Assets > Test Scenes > Local-clip​` to the *Hierarchy* window
 14. Click on *Quad* element and adjust the field URI to point to some file, i.e: file:///D:/movies/test.mkv
 15. Click *Play* button and you should see your movie playing on the white screen
