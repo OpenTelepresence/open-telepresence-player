@@ -24,6 +24,7 @@ static GstClockTime _priv_gst_info_start_time;
 gint gub_ref_count = 0;
 GThread *gub_main_loop_thread = NULL;
 GMainLoop *gub_main_loop = NULL;
+#define VERSION "1.0.0"
 
 gpointer gub_main_loop_func(gpointer data)
 {
@@ -127,8 +128,11 @@ EXPORT_API void gub_ref(const char *gst_debug_string)
         }
 
 #if defined (__ANDROID__)
-        gst_android_register_static_plugins();
-        gst_android_load_gio_modules();
+        // Wihtout these lines the plugin crashes when usign Gstreamer 1.16.2
+        if (!gst_is_initialized()){
+          gst_android_register_static_plugins();
+          gst_android_load_gio_modules();
+        }
 #endif
 
         gub_main_loop_thread = g_thread_new("GstUnityBridge Main Thread", gub_main_loop_func, NULL);
@@ -138,7 +142,10 @@ EXPORT_API void gub_ref(const char *gst_debug_string)
         }
 
         version = gst_version_string();
-        gub_log("%s initialized", version);
+        gub_log("Gstreamer version %s initialized", version);
+        gub_log("GST plugin version %s initialized", VERSION);
+        putenv("ORC_CODE=backup");
+
         g_free(version);
     }
 

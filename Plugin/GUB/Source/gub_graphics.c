@@ -31,6 +31,11 @@
 #define SUPPORT_D3D11 1
 #elif defined(__ANDROID__)
 #define SUPPORT_EGL 1
+#include <EGL/egl.h>
+#include <GLES2/gl2.h>
+#include <gst/gl/gl.h>
+#include <gst/gl/gstglfuncs.h>
+#include <gst/gl/egl/gstgldisplay_egl.h>
 #else
 #define SUPPORT_OPENGL 1
 #endif
@@ -456,6 +461,7 @@ static void gub_copy_texture_egl(GUBGraphicContextEGL *gcontext, GstVideoInfo *v
         GLint previous_tex;
         GLint previous_ab;
         GLint previous_rbo;
+        GLint previous_depth_test;
         GLint previous_vaenabled[2];
 
         GLenum status;
@@ -472,6 +478,9 @@ static void gub_copy_texture_egl(GUBGraphicContextEGL *gcontext, GstVideoInfo *v
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_tex);
         glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previous_ab);
         glGetIntegerv(GL_RENDERBUFFER_BINDING, &previous_rbo);
+        glGetIntegerv(GL_DEPTH_TEST, &previous_depth_test);
+
+
         glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &previous_vaenabled[0]);
         glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &previous_vaenabled[1]);
 
@@ -487,7 +496,6 @@ static void gub_copy_texture_egl(GUBGraphicContextEGL *gcontext, GstVideoInfo *v
         }
 
         glDisable(GL_BLEND);
-        glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glPolygonOffset(0.0f, 0.0f);
         glDisable(GL_POLYGON_OFFSET_FILL);
@@ -516,6 +524,9 @@ static void gub_copy_texture_egl(GUBGraphicContextEGL *gcontext, GstVideoInfo *v
             glDisableVertexAttribArray(0);
         if (!previous_vaenabled[1])
             glDisableVertexAttribArray(1);
+        if (previous_depth_test)
+           glEnable(GL_DEPTH_TEST);
+
         glBindTexture(GL_TEXTURE_2D, previous_tex);
 
         gst_video_frame_unmap(&video_frame);
@@ -596,7 +607,7 @@ static GstContext *gub_provide_graphic_context_egl(GUBGraphicContextEGL *gcontex
             GstStructure *s;
             context = gst_context_new("gst.gl.app_context", TRUE);
             s = gst_context_writable_structure(context);
-            gst_structure_set(s, "context", GST_GL_TYPE_CONTEXT, gcontext->gl, NULL);
+            gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gcontext->gl, NULL);
         }
         else if (g_strcmp0(type, "gst.gl.local_context") == 0) {
             GstGLContext *local_context = gst_gl_context_new(gcontext->display);
@@ -610,7 +621,7 @@ static GstContext *gub_provide_graphic_context_egl(GUBGraphicContextEGL *gcontex
                 GstStructure *s;
                 context = gst_context_new("gst.gl.local_context", TRUE);
                 s = gst_context_writable_structure(context);
-                gst_structure_set(s, "context", GST_GL_TYPE_CONTEXT, local_context, NULL);
+                gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, local_context, NULL);
             }
         }
     }
@@ -634,7 +645,7 @@ static void gub_destroy_graphic_context_egl(GUBGraphicContextEGL *gcontext)
 
 static const gchar *gub_get_video_branch_description_egl()
 {
-    return "glupload ! glcolorconvert ! video/x-raw(memory:GLMemory),texture-target=2D ! fakesink sync=1 qos=1 name=sink";
+    return "glupload ! glcolorconvert ! video/x-raw(memory:GLMemory),texture-target=2D,format=(string)RGBA  ! fakesink sync=1 qos=1 name=sink";
 }
 
 GUBGraphicBackend gub_graphic_backend_egl = {
