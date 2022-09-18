@@ -195,7 +195,7 @@ static void sync_video_position(GUBPipeline *pipeline)
 {    
     if (!pipeline->synced) {
         gint64 position = GST_CLOCK_TIME_NONE;
-	gint64 current_time = gst_clock_get_time(pipeline->net_clock) + MAX_PIPELINE_DELAY_MS*GST_MSECOND;
+		gint64 current_time = gst_clock_get_time(pipeline->net_clock) + MAX_PIPELINE_DELAY_MS*GST_MSECOND;
 	if (current_time < pipeline->basetime) {
 	    gub_log_pipeline(pipeline, "ERROR: %lldns : %lldns", current_time, pipeline->basetime);
 	} else {
@@ -223,6 +223,7 @@ static void message_received(GstBus *bus, GstMessage *message, GUBPipeline *pipe
 	    gst_message_parse_error(message, &error, &debug);
 	    full_msg = g_strdup_printf("[%s] %s (%s)", pipeline->name, error->message, debug);
 	    gub_log_error(full_msg);
+   	    gub_log_pipeline(pipeline, "Bus message: error %s", full_msg);
 	    if (pipeline->on_error_handler != NULL) {
 		pipeline->on_error_handler(pipeline->userdata, error->message);
 	    }
@@ -232,10 +233,24 @@ static void message_received(GstBus *bus, GstMessage *message, GUBPipeline *pipe
 	    break;
 	}
 	case GST_MESSAGE_EOS:
+   	    gub_log_pipeline(pipeline, "Bus message: EOS");
 	    if (pipeline->on_eos_handler != NULL) {
 		pipeline->on_eos_handler(pipeline->userdata);
 	    }
 	    break;
+  case GST_MESSAGE_NEED_CONTEXT:
+	{
+		const gchar *context_type;
+		GstContext *context = NULL;
+		gst_message_parse_context_type (message, &context_type);
+		context = gub_provide_graphic_context(pipeline->graphic_context, context_type);
+		 if (context){
+					 gub_log_pipeline(pipeline, "Query for context type %s answered with context %p", context_type, context);
+					 gst_element_set_context (GST_ELEMENT (message->src), context);
+					 gst_context_unref (context);
+		 }
+		break;
+	}
 	case GST_MESSAGE_QOS:
 	    if (pipeline->on_qos_handler != NULL) {
 		guint64 running_time;
@@ -257,7 +272,7 @@ static void message_received(GstBus *bus, GstMessage *message, GUBPipeline *pipe
 		gst_message_parse_state_changed(message, &old_state, &new_state, &pending_state);
 		g_print("\nPipeline state changed from %s to %s:\n", gst_element_state_get_name(old_state), gst_element_state_get_name(new_state));
 		if (new_state == GST_STATE_PAUSED) {
-		    sync_video_position(pipeline);
+       sync_video_position(pipeline);
 		}
 	    }
 	    break;
@@ -284,7 +299,6 @@ static GstPadProbeReturn pad_probe(GstPad *pad, GstPadProbeInfo *info, gpointer 
     if (context) {
         gst_query_set_context(query, context);
         ret = GST_PAD_PROBE_HANDLED;
-
         gub_log_pipeline(pipeline, "Query for context type %s answered with context %p", context_type, context);
         gst_context_unref(context);
     }
@@ -412,76 +426,74 @@ EXPORT_API void gub_pipeline_setup_decoding(GUBPipeline *pipeline, const gchar *
 
 EXPORT_API gint32 gub_pipeline_grab_frame(GUBPipeline *pipeline, int *width, int *height)
 {
-    //GST_DEBUG_BIN_TO_DOT_FILE((GstBin*)pipeline->pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "pipeline");
-    GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline->pipeline), "sink");
-    GstCaps *last_caps = NULL;
-    GstVideoInfo info;
+  //GST_DEBUG_BIN_TO_DOT_FILE((GstBin*)pipeline->pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "pipeline");
+  GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline->pipeline), "sink");
+  GstCaps *last_caps = NULL;
+  GstVideoInfo info;
 
-    if (!pipeline->graphic_context) {
-        pipeline->graphic_context = gub_create_graphic_context(
-            GST_PIPELINE(pipeline->pipeline),
-            pipeline->video_crop_left, pipeline->video_crop_top, pipeline->video_crop_right, pipeline->video_crop_bottom);
-    }
+  if (!pipeline->graphic_context) {
+    pipeline->graphic_context = gub_create_graphic_context(
+      GST_PIPELINE(pipeline->pipeline),
+      pipeline->video_crop_left, pipeline->video_crop_top, pipeline->video_crop_right, pipeline->video_crop_bottom);
+  }
 
-    if (pipeline->playing == FALSE && pipeline->play_requested == TRUE) {
-        gub_log_pipeline(pipeline, "Setting pipeline to PLAYING");
-        gst_element_set_state(GST_ELEMENT(pipeline->pipeline), GST_STATE_PLAYING);
-        gub_log_pipeline(pipeline, "State change completed");
-        pipeline->playing = TRUE;
-    }
+  if (pipeline->playing == FALSE && pipeline->play_requested == TRUE) {
+    gub_log_pipeline(pipeline, "Setting pipeline to PLAYING");
+    gst_element_set_state(GST_ELEMENT(pipeline->pipeline), GST_STATE_PLAYING);
+    gub_log_pipeline(pipeline, "State change completed");
+    pipeline->playing = TRUE;
+  }
 
-    if (pipeline->last_sample) {
-        gst_sample_unref(pipeline->last_sample);
-        pipeline->last_sample = NULL;
-    }
+  if (pipeline->last_sample) {
+    gst_sample_unref(pipeline->last_sample);
+    pipeline->last_sample = NULL;
+  }
 
-    if (!sink) {
-     //   gub_log_pipeline(pipeline, "Pipeline does not contain a sink named 'sink'");
-        return 0;
-    }
+  if (!sink) {
+    //   gub_log_pipeline(pipeline, "Pipeline does not contain a sink named 'sink'");
+    return 0;
+  }
 
-    g_object_get(sink, "last-sample", &pipeline->last_sample, NULL);
-    gst_object_unref(sink);
-    if (!pipeline->last_sample) {
-      //  gub_log_pipeline(pipeline, "Could not read property 'last-sample' from sink %s",
-        //    gst_plugin_feature_get_name(gst_element_get_factory(sink)));
-        return 0;
-    }
+  g_object_get(sink, "last-sample", &pipeline->last_sample, NULL);
+  gst_object_unref(sink);
+  if (!pipeline->last_sample) {
+    //gub_log_pipeline(pipeline, "Could not read property 'last-sample' from sink %s", gst_plugin_feature_get_name(gst_element_get_factory(sink)));
+    return 0;
+  }
 
-    last_caps = gst_sample_get_caps(pipeline->last_sample);
-    if (!last_caps) {
-        gub_log_pipeline(pipeline, "Sample contains no caps in sink %s",
-            gst_plugin_feature_get_name(gst_element_get_factory(sink)));
-        gst_sample_unref(pipeline->last_sample);
-        pipeline->last_sample = NULL;
-        return 0;
-    }
+  last_caps = gst_sample_get_caps(pipeline->last_sample);
+  if (!last_caps) {
+    gub_log_pipeline(pipeline, "Sample contains no caps in sink %s", gst_plugin_feature_get_name(gst_element_get_factory(sink)));
+    gst_sample_unref(pipeline->last_sample);
+    pipeline->last_sample = NULL;
+    return 0;
+  }
 
-    gst_video_info_from_caps(&info, last_caps);
+  gst_video_info_from_caps(&info, last_caps);
 
 #if 0
-    // Uncomment to have some timing debug information
-    if (pipeline->net_clock) {
-        GstBuffer *buff = gst_sample_get_buffer(pipeline->last_sample);
-        GstClockTime pts = GST_BUFFER_PTS(buff);
-        GstClockTime curr = gst_clock_get_time(pipeline->net_clock);
-        GstClockTime base = gst_element_get_base_time(pipeline->pipeline);
-        gub_log_pipeline(pipeline, "Buffer PTS is %" GST_TIME_FORMAT ", current is %" GST_TIME_FORMAT ", base is %" GST_TIME_FORMAT, GST_TIME_ARGS(pts), GST_TIME_ARGS(curr), GST_TIME_ARGS(base));
-        if (gst_element_get_clock(pipeline->pipeline) != pipeline->net_clock)
-            gub_log_pipeline(pipeline, "WRONG CLOCK: pipeline=%p net_clock=%p", gst_element_get_clock(pipeline->pipeline), pipeline->net_clock);
-    }
+  // Uncomment to have some timing debug information
+  if (pipeline->net_clock) {
+    GstBuffer *buff = gst_sample_get_buffer(pipeline->last_sample);
+    GstClockTime pts = GST_BUFFER_PTS(buff);
+    GstClockTime curr = gst_clock_get_time(pipeline->net_clock);
+    GstClockTime base = gst_element_get_base_time(pipeline->pipeline);
+    gub_log_pipeline(pipeline, "Buffer PTS is %" GST_TIME_FORMAT ", current is %" GST_TIME_FORMAT ", base is %" GST_TIME_FORMAT, GST_TIME_ARGS(pts), GST_TIME_ARGS(curr), GST_TIME_ARGS(base));
+    if (gst_element_get_clock(pipeline->pipeline) != pipeline->net_clock)
+      gub_log_pipeline(pipeline, "WRONG CLOCK: pipeline=%p net_clock=%p", gst_element_get_clock(pipeline->pipeline), pipeline->net_clock);
+  }
 #endif
 
-    if (pipeline->supports_cropping_blit) {
-        *width = (int)(info.width  * (1 - pipeline->video_crop_left - pipeline->video_crop_right));
-        *height = (int)(info.height * (1 - pipeline->video_crop_top - pipeline->video_crop_bottom));
-    }
-    else {
-        *width = info.width;
-        *height = info.height;
-    }
+  if (pipeline->supports_cropping_blit) {
+    *width = (int)(info.width  * (1 - pipeline->video_crop_left - pipeline->video_crop_right));
+    *height = (int)(info.height * (1 - pipeline->video_crop_top - pipeline->video_crop_bottom));
+  }
+  else {
+    *width = info.width;
+    *height = info.height;
+  }
 
-    return 1;
+  return 1;
 }
 
 EXPORT_API void gub_pipeline_blit_image(GUBPipeline *pipeline, void *_TextureNativePtr)
@@ -517,60 +529,65 @@ GstEncodingProfile * gub_pipeline_create_mp4_h264_profile(void)
     return (GstEncodingProfile*)prof;
 }
 
-EXPORT_API void gub_pipeline_setup_encoding(GUBPipeline *pipeline, const gchar *filename,
-    int width, int height)
+EXPORT_API gub_pipeline_setup_rtp_h264_encoding(GUBPipeline *pipeline, const gchar *host, int port, int width, int height)
 {
-    GError *err = NULL;
-    GstElement *encodebin, *filesink;
-    GstCaps *raw_caps;
-    gchar *raw_caps_description = NULL;
-    GstBus *bus = NULL;
-    GstPad *encodebin_sink_pad = NULL, *appsrc_src_pad = NULL;
+  GError *err = NULL;
+  GstElement *rtph264pay, *udpsink, *rtp_bin, *conv, *enc, *queue;
+  GstCaps *raw_caps;
+  gchar *raw_caps_description = NULL;
+  GstBus *bus = NULL;
+  GstPad *encodebin_sink_pad = NULL, *appsrc_src_pad = NULL;
 
-    if (pipeline->pipeline) {
-        gub_pipeline_close(pipeline);
-    }
+  if (pipeline->pipeline) {
+    gub_pipeline_close(pipeline);
+  }
 
-    pipeline->pipeline = gst_pipeline_new(NULL);
-    pipeline->video_width = width;
-    pipeline->video_height = height;
+  pipeline->pipeline = gst_pipeline_new(NULL);
+  pipeline->video_width = width;
+  pipeline->video_height = height;
 
-    raw_caps_description = g_strdup_printf("video/x-raw,format=RGBA,width=%d,height=%d", width, height);
-    raw_caps = gst_caps_from_string(raw_caps_description);
-    gub_log_pipeline(pipeline, "Using video caps: %s", raw_caps_description);
-    g_free(raw_caps_description);
+  raw_caps_description = g_strdup_printf("video/x-raw,format=RGBA,width=%d,height=%d", width, height);
+  raw_caps = gst_caps_from_string(raw_caps_description);
+  gub_log_pipeline(pipeline, "Using video caps: %s", raw_caps_description);
+  g_free(raw_caps_description);
 
-    pipeline->appsrc = GST_APP_SRC(gst_element_factory_make("appsrc", "source"));
-    gub_log_pipeline(pipeline, "Using appsrc: %p", pipeline->appsrc);
-    gst_app_src_set_caps(pipeline->appsrc, raw_caps);
-    g_object_set(pipeline->appsrc,
-        "stream-type", 0,
-        "max-bytes", width*height * 4 * 10,
-        "is-live", TRUE,
-        "do-timestamp", TRUE,
-        "format", GST_FORMAT_TIME,
-        "min-latency", 0, NULL);
+  pipeline->appsrc = GST_APP_SRC(gst_element_factory_make("appsrc", "source"));
+  gst_app_src_set_caps(pipeline->appsrc, raw_caps);
+  g_object_set(G_OBJECT(pipeline->appsrc), "stream-type", 0, NULL);
+  g_object_set(G_OBJECT(pipeline->appsrc), "max-bytes", width*height * 4 * 10, NULL);
+  g_object_set(G_OBJECT(pipeline->appsrc), "is-live", TRUE, NULL);
+  g_object_set(G_OBJECT(pipeline->appsrc), "do-timestamp", TRUE, NULL);
+  g_object_set(G_OBJECT(pipeline->appsrc), "format", GST_FORMAT_TIME, NULL);
+  g_object_set(G_OBJECT(pipeline->appsrc), "min-latency", 0, NULL);
 
-    encodebin = gst_element_factory_make("encodebin", NULL);
-    gub_log_pipeline(pipeline, "Using encodebin: %p", encodebin);
-    g_object_set(encodebin, "profile", gub_pipeline_create_mp4_h264_profile(), NULL);
-    g_signal_emit_by_name(encodebin, "request-pad", raw_caps, &encodebin_sink_pad);
-    gub_log_pipeline(pipeline, "Using encodebin_sink_pad: %p", encodebin_sink_pad);
+  conv = gst_element_factory_make("videoconvert", "conv");
+  queue = gst_element_factory_make("queue", "queue");
+  enc = gst_element_factory_make("openh264enc", "enc");
 
-    filesink = gst_element_factory_make("filesink", NULL);
-    g_object_set(filesink, "location", filename, NULL);
-    gub_log_pipeline(pipeline, "Using filesink: %p, location: %s", filesink, filename);
+  rtph264pay = gst_element_factory_make("rtph264pay", "pay");
+  g_object_set(G_OBJECT(rtph264pay), "config-interval", 1, NULL);
+  g_object_set(G_OBJECT(rtph264pay), "pt", 96, NULL);
 
-    gst_bin_add_many(GST_BIN(pipeline->pipeline), GST_ELEMENT(pipeline->appsrc), encodebin, filesink, NULL);
+  udpsink = gst_element_factory_make("udpsink", "udp");
+  g_object_set(G_OBJECT(udpsink), "host", host, NULL);
+  g_object_set(G_OBJECT(udpsink), "port", port, NULL);
 
-    appsrc_src_pad = gst_element_get_static_pad(GST_ELEMENT(pipeline->appsrc), "src");
-    gst_pad_link(appsrc_src_pad, encodebin_sink_pad);
-    gst_element_link(encodebin, filesink);
+  gst_bin_add_many(GST_BIN(pipeline->pipeline), GST_ELEMENT(pipeline->appsrc), conv, queue, enc, rtph264pay, udpsink, NULL);
+  appsrc_src_pad = gst_element_get_static_pad(GST_ELEMENT(pipeline->appsrc), "src");
+  gst_pad_link(appsrc_src_pad, encodebin_sink_pad);
 
-    bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline->pipeline));
-    gst_bus_add_signal_watch(bus);
-    gst_object_unref(bus);
-    g_signal_connect(bus, "message", G_CALLBACK(message_received), pipeline);
+  if (gst_element_link_many(GST_ELEMENT(pipeline->appsrc), conv, queue, enc, rtph264pay, udpsink, NULL) != TRUE){
+    gub_log_pipeline(pipeline, "Error: Cannot link elements!! ");
+    return -1;
+  }
+
+  bus = gst_pipeline_get_bus(GST_PIPELINE(pipeline->pipeline));
+  gst_bus_add_signal_watch(bus);
+  gst_object_unref(bus);
+  g_signal_connect(bus, "message", G_CALLBACK(message_received), pipeline);
+
+  gub_log_pipeline(pipeline, "Capture pipeline is ready for use.");
+  return 0;
 }
 
 EXPORT_API void gub_pipeline_consume_image(GUBPipeline *pipeline, guint8 *rawdata, int size)
@@ -580,19 +597,19 @@ EXPORT_API void gub_pipeline_consume_image(GUBPipeline *pipeline, guint8 *rawdat
     int line;
     int stride = pipeline->video_width * 4;
 
-    gst_buffer_map(buffer, &mi, GST_MAP_WRITE);
-    for (line = 0; line < pipeline->video_height; line++)
-    {
-        memcpy(mi.data + line * stride, rawdata + (pipeline->video_height - 1 - line) * stride, stride);
-    }
-    gst_buffer_unmap(buffer, &mi);
-
     if (pipeline->playing == FALSE && pipeline->play_requested == TRUE) {
         gub_log_pipeline(pipeline, "Setting pipeline to PLAYING");
         gst_element_set_state(GST_ELEMENT(pipeline->pipeline), GST_STATE_PLAYING);
         gub_log_pipeline(pipeline, "State change completed");
         pipeline->playing = TRUE;
     }
+
+    gst_buffer_map(buffer, &mi, GST_MAP_WRITE);
+    for (line = 0; line < pipeline->video_height; line++)
+    {
+        memcpy(mi.data + line * stride, rawdata + (pipeline->video_height - 1 - line) * stride, stride);
+    }
+    gst_buffer_unmap(buffer, &mi);
 
     gst_app_src_push_buffer(pipeline->appsrc, buffer);
 }
